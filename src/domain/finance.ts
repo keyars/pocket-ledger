@@ -1,5 +1,14 @@
-export type Category = 'Housing' | 'Food' | 'Transport' | 'Bills' | 'Health' | 'Fun' | 'Other';
-export type EntryType = 'income' | 'expense';
+export const CATEGORIES = ['Housing', 'Food', 'Transport', 'Bills', 'Health', 'Fun', 'Shopping', 'Education', 'Other'] as const;
+export type Category = (typeof CATEGORIES)[number];
+export type EntryType = 'income' | 'expense' | 'transfer';
+
+export interface Account {
+  id: string;
+  name: string;
+  openingBalance: number;
+  currency: 'INR';
+  archived?: boolean;
+}
 
 export interface LedgerEntry {
   id: string;
@@ -8,7 +17,25 @@ export interface LedgerEntry {
   amount: number;
   category: Category;
   date: string;
+  accountId: string;
+  toAccountId?: string;
   note?: string;
+  recurring?: boolean;
+}
+
+export interface Budget {
+  id: string;
+  category: Category;
+  limit: number;
+  month: string;
+}
+
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  target: number;
+  saved: number;
+  deadline?: string;
 }
 
 export interface FinanceSummary {
@@ -16,27 +43,42 @@ export interface FinanceSummary {
   expenses: number;
   balance: number;
   savingsRate: number;
+  netCashFlow: number;
 }
 
-export const calculateSummary = (entries: LedgerEntry[]): FinanceSummary => {
+export const calculateSummary = (entries: LedgerEntry[], accounts: Account[] = []): FinanceSummary => {
   const income = entries.filter((entry) => entry.type === 'income').reduce((sum, entry) => sum + entry.amount, 0);
   const expenses = entries.filter((entry) => entry.type === 'expense').reduce((sum, entry) => sum + entry.amount, 0);
-  const balance = income - expenses;
-  const savingsRate = income > 0 ? Math.max(0, Math.round((balance / income) * 100)) : 0;
-
-  return { income, expenses, balance, savingsRate };
+  const opening = accounts.reduce((sum, account) => sum + account.openingBalance, 0);
+  const balance = opening + income - expenses;
+  const netCashFlow = income - expenses;
+  const savingsRate = income > 0 ? Math.round((netCashFlow / income) * 100) : 0;
+  return { income, expenses, balance, savingsRate, netCashFlow };
 };
 
 export const spendingByCategory = (entries: LedgerEntry[]) => {
-  const totals = entries
-    .filter((entry) => entry.type === 'expense')
-    .reduce<Partial<Record<Category, number>>>((acc, entry) => {
-      acc[entry.category] = (acc[entry.category] ?? 0) + entry.amount;
-      return acc;
-    }, {});
-
+  const totals = entries.filter((entry) => entry.type === 'expense').reduce<Partial<Record<Category, number>>>((acc, entry) => {
+    acc[entry.category] = (acc[entry.category] ?? 0) + entry.amount;
+    return acc;
+  }, {});
   return (Object.entries(totals) as [Category, number][]).sort((a, b) => b[1] - a[1]);
 };
 
-export const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
+export const accountBalance = (account: Account, entries: LedgerEntry[]) => {
+  const relevant = entries.filter((entry) => entry.accountId === account.id);
+  return account.openingBalance + relevant.reduce((balance, entry) => {
+    if (entry.type === 'income') return balance + entry.amount;
+    if (entry.type === 'expense') return balance - entry.amount;
+    if (entry.type === 'transfer') return balance - entry.amount;
+    return balance;
+  }, 0);
+};
+
+export const budgetProgress = (budget: Budget, entries: LedgerEntry[]) => {
+  const spent = entries.filter((entry) => entry.type === 'expense' && entry.category === budget.category && entry.date.startsWith(budget.month)).reduce((sum, entry) => sum + entry.amount, 0);
+  return { spent, remaining: Math.max(0, budget.limit - spent), percent: budget.limit > 0 ? Math.min(100, Math.round((spent / budget.limit) * 100)) : 0 };
+};
+
+export const goalProgress = (goal: SavingsGoal) => goal.target > 0 ? Math.min(100, Math.round((goal.saved / goal.target) * 100)) : 0;
+
+export const formatCurrency = (amount: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
