@@ -1,0 +1,14 @@
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { formatCurrency } from '../../src/domain/finance';
+import { useLedgerStore } from '../../src/store/useLedgerStore';
+
+export default function Transactions() {
+  const entries = useLedgerStore((s) => s.entries);
+  const removeEntry = useLedgerStore((s) => s.removeEntry);
+  return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.container}>
+    <Text style={styles.eyebrow}>ACTIVITY</Text><Text style={styles.title}>Every rupee, accounted for.</Text><Text style={styles.subtitle}>A clear history of your income, spending and transfers.</Text>
+    {entries.length === 0 ? <View style={styles.empty}><Text style={styles.emptyIcon}>↕</Text><Text style={styles.emptyTitle}>No transactions yet</Text><Text style={styles.emptyText}>Add an expense from Overview to start building your private ledger.</Text></View> : entries.map((entry) => <View key={entry.id} style={styles.row}><View style={styles.rowLeft}><View style={[styles.badge, entry.type === 'income' ? styles.income : styles.expense]}><Text>{entry.type === 'income' ? '↑' : '↓'}</Text></View><View><Text style={styles.name}>{entry.title}</Text><Text style={styles.meta}>{entry.category} · {new Date(entry.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</Text></View></View><View style={styles.rowRight}><Text style={[styles.amount, entry.type === 'income' ? styles.incomeText : styles.expenseText]}>{entry.type === 'income' ? '+' : '-'}{formatCurrency(entry.amount)}</Text><Pressable onPress={() => removeEntry(entry.id)}><Text style={styles.delete}>Remove</Text></Pressable></View></View>)}
+  </ScrollView></SafeAreaView>;
+}
+const styles=StyleSheet.create({safe:{flex:1,backgroundColor:'#F7F7F2'},container:{padding:22,gap:12,paddingBottom:30},eyebrow:{fontSize:11,fontWeight:'900',letterSpacing:2,color:'#6D746E',marginTop:8},title:{fontSize:28,lineHeight:34,fontWeight:'800',color:'#17251B'},subtitle:{color:'#697069',lineHeight:20,marginBottom:8},row:{backgroundColor:'#FFF',borderRadius:20,padding:16,flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:12},rowLeft:{flexDirection:'row',alignItems:'center',gap:12,flex:1},badge:{width:38,height:38,borderRadius:19,alignItems:'center',justifyContent:'center'},income:{backgroundColor:'#E6F1E8'},expense:{backgroundColor:'#F1ECE7'},name:{fontSize:15,fontWeight:'800',color:'#252B26'},meta:{fontSize:12,color:'#7B817B',marginTop:3},rowRight:{alignItems:'flex-end',gap:5},amount:{fontSize:14,fontWeight:'900'},incomeText:{color:'#356A43'},expenseText:{color:'#9A503E'},delete:{fontSize:11,color:'#8A8F89',fontWeight:'700'},empty:{marginTop:40,backgroundColor:'#FFF',borderRadius:24,padding:28,alignItems:'center',gap:8},emptyIcon:{fontSize:34,color:'#17251B'},emptyTitle:{fontSize:19,fontWeight:'800',color:'#17251B'},emptyText:{textAlign:'center',color:'#727972',lineHeight:20}}
+});
